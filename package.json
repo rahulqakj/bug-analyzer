@@ -5,7 +5,6 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
     "analyze-slack": "ts-node src/index.ts",
     "fetch-only": "ts-node src/index.ts --no-analysis",
     "lint": "eslint . --ext .ts"
