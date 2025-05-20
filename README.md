@@ -45,7 +45,7 @@ A simple tool that analyzes Slack bug report channels and generates comprehensiv
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd slack-bug-analyzer
+cd bug-analyzer
 ```
 
 2. Install dependencies:
