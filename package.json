@@ -1,0 +1,33 @@
+{
+  "name": "slack-bug-analyzer",
+  "version": "1.0.0",
+  "description": "AI agent to analyze Slack bug reports and generate insights",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "analyze-slack": "ts-node src/index.ts",
+    "fetch-only": "ts-node src/index.ts --no-analysis",
+    "lint": "eslint . --ext .ts"
+  },
+  "keywords": [
+    "ai",
+    "bug-report",
+    "analysis"
+  ],
+  "author": "Rahul Joshua Damanik",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/web-api": "^6.9.0",
+    "dotenv": "^16.3.1",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
