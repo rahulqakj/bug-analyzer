@@ -38,13 +38,11 @@ export async function saveAnalysisToFile(
  */
 export async function saveRawMessagesToFile(formattedMessages: string): Promise<string> {
   try {
-    // Create raw-messages directory
     const rawMessagesDir = path.join(config.outputDir, 'raw-messages');
     await fs.mkdir(rawMessagesDir, { recursive: true });
-    
-    // Get current date in YYYY-MM-DD format
+
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const dateStr = today.toISOString().split('T')[0];
     
     const filename = `raw-slack-messages-${dateStr}.txt`;
     const filePath = path.join(rawMessagesDir, filename);
