@@ -81,11 +81,6 @@ npm run analyze-slack
 npm run fetch-only
 ```
 
-### Development mode
-```bash
-npm run dev
-```
-
 ## Environment Variables
 
 | Variable | Description | Required |
