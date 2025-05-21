@@ -17,7 +17,7 @@ const aiClient = new OpenAI({
  */
 export async function analyzeMessages(formattedMessages: string): Promise<string> {
   try {
-    console.log('Starting bug analysis with conversation batching...');
+    console.log('Starting bug analysis and report generation in a single request...');
     
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
@@ -32,7 +32,7 @@ export async function analyzeMessages(formattedMessages: string): Promise<string
     console.log(`Split messages into ${messageBatches.length} batches for processing`);
     
     const conversationMessages: ChatCompletionMessageParam[] = [
-      { role: 'system', content: getComprehensiveAnalysisPrompt() }
+      { role: 'system', content: getAnalysisAndReportPrompt() }
     ];
 
     messageBatches.forEach((batch: string, index: number) => {
@@ -49,8 +49,8 @@ export async function analyzeMessages(formattedMessages: string): Promise<string
     );
     console.log(`Conversation batches saved to ${batchesFilename}`);
     
-    console.log('Sending batched conversation to DeepSeek API...');
-    const analysisResponse = await withRetry(async () => {
+    console.log('Sending batched conversation to DeepSeek API for unified analysis and report...');
+    const response = await withRetry(async () => {
       return await aiClient.chat.completions.create({
         model: config.ai.model,
         messages: conversationMessages,
@@ -59,24 +59,7 @@ export async function analyzeMessages(formattedMessages: string): Promise<string
       });
     }, 3, 2000);
     
-    const analysis = analysisResponse.choices[0].message.content ?? '';
-    
-    console.log('Analysis completed');
-    
-    console.log('Generating final markdown report...');
-    const finalReportResponse = await withRetry(async () => {
-      return await aiClient.chat.completions.create({
-        model: config.ai.model,
-        messages: [
-          { role: 'system', content: getFinalReportPrompt() },
-          { role: 'user', content: `Buat laporan berdasarkan data analisis berikut:\n\n${analysis}` }
-        ],
-        temperature: 0,
-        max_tokens: config.ai.maxOutputTokens,
-      });
-    }, 3, 1000);
-    
-    const finalReport = finalReportResponse.choices[0].message.content ?? '';
+    const finalReport = response.choices[0].message.content ?? '';
     
     const reportFilename = `final_report-${dateStr}.md`;
     await fs.writeFile(path.join(finalReportsDir, reportFilename), finalReport);
@@ -97,85 +80,42 @@ export async function analyzeMessages(formattedMessages: string): Promise<string
  * Get the comprehensive analysis prompt
  * @returns Prompt string
  */
-function getComprehensiveAnalysisPrompt(): string {
-  return `Anda adalah analis bug ahli. Analisis pesan dari channel bug report Slack yang akan diberikan dalam beberapa bagian. Gabungkan semua informasi dari semua bagian untuk memberikan analisis tentang:
+function getAnalysisAndReportPrompt(): string {
+  return `Anda adalah seorang analis bug profesional. Tugas Anda adalah membaca dan menganalisis pesan-pesan dari channel bug report Slack (yang akan diberikan dalam beberapa bagian). Gabungkan seluruh informasi dari semua bagian untuk menghasilkan satu laporan akhir yang komprehensif, terstruktur, dan mudah dipahami dalam format markdown.
 
-1. BUGS REPORTED
-   - Semua bug yang disebutkan, siapa yang melaporkannya, kapan, status penyelesaian
-   - Command/perintah yang digunakan untuk memperbaiki (jika disebutkan)
-   - Bug-bug yang paling sering muncul dan paling parah
-   - Kategori bug (UI, backend, database, API, keamanan, performa, dll)
+Laporan akhir harus memuat:
 
-2. REPORTER STATISTICS
-   - Siapa saja yang melaporkan bug (urutkan berdasarkan jumlah laporan)
-   - Berapa bug yang dilaporkan oleh masing-masing orang
-   - Jenis bug yang dilaporkan oleh masing-masing orang
-   - Kualitas laporan dari setiap pelapor (detail/tidak detail)
+1. **Ringkasan Eksekutif**  
+   Sajikan highlight temuan utama, statistik penting, dan insight paling menonjol dari seluruh laporan.
 
-3. COMMAND STATISTICS
-   - Command apa saja yang disebutkan untuk memperbaiki bug
-   - Berapa kali masing-masing command digunakan
-   - Untuk bug jenis apa command tersebut digunakan
-   - Siapa yang paling sering memberikan solusi dengan command
+2. **Daftar & Analisis Bug**  
+   - Rincikan semua bug yang dilaporkan: siapa pelapor, waktu, status penyelesaian.  
+   - Identifikasi bug yang paling sering muncul dan paling berdampak.  
+   - Kelompokkan bug berdasarkan kategori (UI, backend, database, API, keamanan, performa, dll).
 
-4. RESOLUTION TIME
-   - Rata-rata waktu penyelesaian bug (dalam menit)
-   - Bug yang paling cepat dan paling lama diselesaikan
-   - Faktor-faktor yang mempengaruhi kecepatan penyelesaian
-   - Siapa yang menyelesaikan bug paling cepat (rata-rata)
+3. **Statistik Pelapor**  
+   - Urutkan pelapor bug terbanyak (top 5), jumlah dan jenis bug yang mereka laporkan.  
+   - Evaluasi kualitas laporan dari masing-masing pelapor (apakah detail atau tidak).
 
-5. TRENDS AND RECOMMENDATIONS
-   - Pola kemunculan bug (hari/waktu tertentu, setelah deployment, dll)
-   - Area yang memerlukan lebih banyak pengujian atau perhatian
-   - Saran untuk meningkatkan proses pelaporan dan penyelesaian bug
+4. **Statistik Command & Solusi**  
+   - Daftar command/perintah yang digunakan untuk memperbaiki bug, seberapa sering digunakan, dan efektivitasnya.  
+   - Siapa yang paling sering memberikan solusi.
 
-PENTING: "No purchase data found" BUKAN bug dan TIDAK dihitung sebagai bug.
+5. **Waktu Penyelesaian**  
+   - Hitung rata-rata waktu penyelesaian bug (dalam menit).  
+   - Sebutkan bug yang paling cepat dan paling lama diselesaikan, serta faktor yang mempengaruhi kecepatan penyelesaian.  
+   - Siapa yang paling cepat dalam menyelesaikan bug.
 
-Saya akan memberikan pesan Slack dalam beberapa bagian. Bacalah semua bagian, pahami konteksnya secara keseluruhan, dan berikan analisis komprehensif dalam format JSON yang terstruktur.`;
-}
+6. **Tren & Pola**  
+   - Temukan pola kemunculan bug (misal: hari/waktu tertentu, setelah deployment, dsb).  
+   - Area yang perlu perhatian atau pengujian lebih lanjut.  
+   - Analisis tren bug yang meningkat atau menurun, serta korelasi antar bug.
 
-/**
- * Get prompt for final comprehensive report
- * @returns Final report prompt
- */
-function getFinalReportPrompt(): string {
-  return `Anda adalah analis bug ahli. Berdasarkan data analisis JSON dari channel bug report Slack, buat laporan analisis yang komprehensif dan terstruktur.
+7. **Rekomendasi**  
+   - Berikan saran untuk meningkatkan proses pelaporan dan penyelesaian bug.  
+   - Rekomendasikan langkah pencegahan agar bug serupa tidak terulang.
 
-Laporan harus mencakup bagian-bagian berikut:
+**Catatan Penting:** Abaikan pesan "No purchase data found" karena itu bukan bug dan tidak perlu dianalisis.
 
-1. RINGKASAN EKSEKUTIF
-   - Gambaran umum temuan utama
-   - Statistik penting dan highlight
-
-2. BUG YANG DILAPORKAN
-   - Ringkasan semua bug yang dilaporkan, berdasarkan frekuensi dan dampaknya
-   - Bug-bug yang paling sering muncul dan paling parah
-   - Kategori bug (UI, backend, database, API, keamanan, performa, dll)
-
-3. PENYELESAIAN BUG
-   - Command atau perintah yang paling sering digunakan untuk menyelesaikan bug
-   - Metode penyelesaian yang umum digunakan
-   - Solusi paling efektif berdasarkan tingkat keberhasilan
-
-4. WAKTU PENYELESAIAN
-   - Rata-rata waktu yang dibutuhkan untuk menyelesaikan bug
-   - Bug yang memerlukan waktu terlama untuk diselesaikan dan alasannya
-   - Bug yang diselesaikan paling cepat dan faktor yang membuatnya cepat
-
-5. PELAPOR BUG
-   - Siapa yang paling sering melaporkan bug (peringkat 5 teratas)
-   - Kualitas laporan bug dari masing-masing pelapor
-   - Hubungan antara pelapor dan jenis bug
-
-6. TREN DAN POLA
-   - Pola kemunculan bug (hari/waktu tertentu, setelah deployment, dll)
-   - Tren bug yang sedang berkembang atau menurun
-   - Korelasi antara berbagai bug
-
-7. REKOMENDASI
-   - Area yang memerlukan lebih banyak pengujian atau perhatian
-   - Saran untuk meningkatkan proses pelaporan dan penyelesaian bug
-   - Langkah-langkah pencegahan untuk menghindari bug serupa di masa depan
-
-Format laporan dengan rapi dan profesional, dan sertakan tabel, poin, dan visualisasi (yang dideskripsikan) jika relevan.`;
+Format laporan harus rapi, profesional, dan mudah dibaca. Gunakan tabel, bullet, dan deskripsi visualisasi jika relevan. Pastikan membaca seluruh bagian pesan sebelum menyusun laporan akhir.`;
 } 
